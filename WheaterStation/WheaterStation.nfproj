@@ -18,6 +18,7 @@
   </PropertyGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.props" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.props')" />
   <ItemGroup>
+    <Compile Include="Connectivity\WiFi.cs" />
     <Compile Include="Periphery\Display.cs" />
     <Compile Include="Periphery\TemperatureSensor.cs" />
     <Compile Include="Program.cs" />
