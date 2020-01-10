@@ -1,36 +1,108 @@
-﻿using nanoFramework.Hardware.Esp32;
+﻿using nanoFramework.Runtime.Native;
 using System;
+using System.Net.NetworkInformation;
 using System.Threading;
 using WheaterStation.Connectivity;
+using WheaterStation.Server;
+using WiFiAP;
 using Windows.Devices.Gpio;
-using Windows.Devices.WiFi;
 
 namespace WheaterStation
 {
-    static class Programm
+    public class Program
     {
+        // Start Simple WebServer
+        static WebServer server = new WebServer();
+        static WheaterStationServer wheaterStationServer = new WheaterStationServer();
+
+        // Connected Station count
+        static int connectedCount = 0;
+
+        // Gpio pin used to put device into AP setup mode
+        const int SETUP_PIN = 5;
+
         public static void Main()
         {
-            Console.WriteLine("Starting!");
+            Console.WriteLine("Welcome to WiFI Soft AP world!");
 
-            var gpioController = new GpioController();
-            var pin = gpioController.OpenPin(Gpio.IO13);
+            GpioPin setupButton = GpioController.GetDefault().OpenPin(SETUP_PIN);
+            setupButton.SetDriveMode(GpioPinDriveMode.InputPullUp);
 
-            pin.SetDriveMode(GpioPinDriveMode.Output);
-
-            try
+            // If Wireless station is not enabled then start Soft AP to allow Wireless configuration
+            // or Button pressed
+            if (!WirelessController.IsEnabled() || (setupButton.Read() == GpioPinValue.Low))
             {
-                var wifi = new WiFi();
-                wifi.StartSniffing();
+                WirelessController.Disable();
 
-                Thread.Sleep(Timeout.Infinite);
+                if (WirelessAP.Setup() == false)
+                {
+                    // Reboot device to Activate Access Point on restart
+                    Console.WriteLine($"Setup Soft AP, Rebooting device");
+                    Power.RebootDevice();
+                }
+
+                Console.WriteLine($"Running Soft AP, waiting for client to connect");
+                Console.WriteLine($"Soft AP IP address :{WirelessAP.GetIP()}");
+
+                // Link up Network event to show Stations connecting/disconnecting to Access point.
+                NetworkChange.NetworkAPStationChanged += NetworkChange_NetworkAPStationChanged; ;
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine("message:" + ex.Message);
-                Console.WriteLine("stack:" + ex.StackTrace);
+                Console.WriteLine($"Running in normal mode, connecting to Access point");
+
+                string IpAdr = WirelessController.WaitIP();
+                Console.WriteLine($"Connected as {IpAdr}");
+
+                wheaterStationServer.Start();
+            }
+
+            // Just wait
+            Thread.Sleep(Timeout.Infinite);
+        }
+
+        /// <summary>
+        /// Event handler for Stations connecting or Disconnecting
+        /// </summary>
+        /// <param name="NetworkIndex">The index of Network Interface raising event</param>
+        /// <param name="e">Event argument</param>
+        private static void NetworkChange_NetworkAPStationChanged(int NetworkIndex, NetworkAPStationEventArgs e)
+        {
+            Console.WriteLine($"NetworkAPStationChanged event Index:{NetworkIndex} Connected:{e.IsConnected} Station:{e.StationIndex} ");
+
+            // if connected then get information on the connecting station 
+            if (e.IsConnected)
+            {
+                WirelessAPConfiguration wapconf = WirelessAPConfiguration.GetAllWirelessAPConfigurations()[0];
+                WirelessAPStation station = wapconf.GetConnectedStations(e.StationIndex);
+
+                string macString = BitConverter.ToString(station.MacAddres);
+                Console.WriteLine($"Station mac {macString} Rssi:{station.Rssi} PhyMode:{station.PhyModes} ");
+
+                connectedCount++;
+
+                // Start web server when it connects otherwise the bind to network will fail as 
+                // no connected network. Start web server when first station connects 
+                if (connectedCount == 1)
+                {
+                    // Wait for Staion to be fully connected before starting web server
+                    // other you will get a Network error
+                    Thread.Sleep(2000);
+                    server.Start();
+                }
+            }
+            else
+            {
+                // Station disconnected. When no more station connected then stop webserver
+                if (connectedCount > 0)
+                {
+                    connectedCount--;
+                    if (connectedCount == 0)
+                        server.Stop();
+                }
             }
 
         }
     }
 }
+
