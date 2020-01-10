@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace WiFiAP
 {
-    public class WebServer
+    public class WheaterStationServer
     {
         private HttpListener _listener;
         private Thread _serverThread;
@@ -65,7 +65,7 @@ namespace WiFiAP
                     else
                     {
                         response.ContentType = "text/html";
-                        responseString = ReplaceMessage(Resources.GetString(Resources.StringResources.main), "");
+                        responseString = "<!DOCTYPE html><html><head><title>Hello World HTML</title></head><body><h1>Hello World</h1></body></html>";
                         OutPutResponse(response, responseString);
                     }
                     break;

@@ -10,6 +10,7 @@ namespace WiFiAP
     {
         // Start Simple WebServer
         static WebServer server = new WebServer();
+        static WheaterStationServer wheaterStationServer = new WheaterStationServer();
 
         // Connected Station count
         static int connectedCount = 0;
@@ -46,10 +47,12 @@ namespace WiFiAP
             else
             {
                 Console.WriteLine($"Running in normal mode, connecting to Access point");
+
                 string IpAdr = Wireless80211.WaitIP();
                 Console.WriteLine($"Connected as {IpAdr}");
-            }
 
+                wheaterStationServer.Start();
+            }
 
             // Just wait
             Thread.Sleep(Timeout.Infinite);
